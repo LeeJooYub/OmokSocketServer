@@ -1,6 +1,6 @@
 
 
-namespace SocketServer.GameState;
+namespace SocketServer.Managers;
 
 
 /// 유저 클래스

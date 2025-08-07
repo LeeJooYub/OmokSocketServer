@@ -1,4 +1,4 @@
-namespace SocketServer.GameState;
+namespace SocketServer.Managers;
 
 
 // 방 관리 클래스

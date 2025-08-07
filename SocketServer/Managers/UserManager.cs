@@ -2,7 +2,7 @@
 
 using SocketServer;
 
-namespace SocketServer.GameState;
+namespace SocketServer.Managers;
 
 /// <summary>
 /// 유저 관리자 클래스

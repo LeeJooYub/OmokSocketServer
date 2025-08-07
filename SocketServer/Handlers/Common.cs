@@ -1,5 +1,5 @@
 using SocketServer.Packet;
-using SocketServer.GameState;
+using SocketServer.Managers;
 using MessagePack;
 
 namespace SocketServer.Handlers;
@@ -24,7 +24,7 @@ public class ConnectionHandler : HandlerBase
 
     public void HandleNotifyInConnectClient(ServerPacketData requestData)
     {
-        MainServer.s_MainLogger.Debug($"Current Connected Session Count: {_mainServer.SessionCount}");
+        
     }
 
     public void HandleNotifyInDisConnectClient(ServerPacketData requestData)
@@ -48,7 +48,7 @@ public class ConnectionHandler : HandlerBase
                 var internalPacket = new ServerPacketData();
                 internalPacket.SetPacketData(sessionID, (Int16)PacketId.NtfInRoomLeave, packetBodyData);
 
-                _mainServer.Distribute(internalPacket);
+                DistributeFunc(internalPacket);
             }
 
             _userManager.RemoveUser(sessionID);
@@ -109,7 +109,7 @@ public class ConnectionHandler : HandlerBase
         var bodyData = MessagePackSerializer.Serialize(resLogin);
         var sendData = PacketToBytes.Make(PacketId.ResLogin, bodyData);
 
-        _mainServer.SendData(sessionID, sendData);
+        NetSendFunc(sessionID, sendData);
     }
 
     public void SendNotifyMustCloseToClient(ErrorCode errorCode, string sessionID)
@@ -122,7 +122,7 @@ public class ConnectionHandler : HandlerBase
         var bodyData = MessagePackSerializer.Serialize(resLogin);
         var sendData = PacketToBytes.Make(PacketId.NtfMustClose, bodyData);
 
-        _mainServer.SendData(sessionID, sendData);
+        NetSendFunc(sessionID, sendData);
     }
 
 

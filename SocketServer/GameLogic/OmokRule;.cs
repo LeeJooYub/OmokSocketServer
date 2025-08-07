@@ -8,7 +8,7 @@ namespace SocketServer.GameLogic;
 public class OmokRule
 {
     // 오목판 크기(15x15 등)
-    const int BoardSize = 15;
+    const int BoardSize = 19;
 
     // 승리 조건 체크: 0이면 승부가 나지 않음, 1이면 플레이어1(백)의 승리, 2이면 플레이어2(흑)의 승리
     public int CheckWinCondition(OmokBoard board, int lastX, int lastY)

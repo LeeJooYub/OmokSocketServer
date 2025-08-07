@@ -7,7 +7,7 @@ using SuperSocketLite.SocketBase;
 using SuperSocketLite.SocketBase.Protocol;
 using SuperSocketLite.SocketBase.Config;
 
-using SocketServer.GameState;
+using SocketServer.Managers;
 using SocketServer.Handlers;
 using SocketServer.Packet;
 

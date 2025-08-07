@@ -8,7 +8,7 @@ using MessagePack;
 using SocketServer.Packet;
 using SocketServer.GameLogic;
 
-namespace SocketServer.GameState;
+namespace SocketServer.Managers;
 
 public class Room
 {
@@ -44,7 +44,7 @@ public class Room
         _userList.Add(roomUser);
 
         return true;
-        
+
     }
     public bool GetIsGameStart()
     {
@@ -71,7 +71,7 @@ public class Room
     //유저가 백인지, 흑인지 확인
     public int GetPlayerColor(string userId)
     {
-        for(int i = 0; i < _userList.Count; i++)
+        for (int i = 0; i < _userList.Count; i++)
         {
             var user = _userList[i];
             if (user.UserID == userId)
@@ -106,7 +106,7 @@ public class Room
         omokBoard.Initialize(); // 오목판 초기화
         return true;
     }
-    
+
     public bool InitializeRoom()
     {
         if (_userList.Count == 0)
@@ -179,48 +179,6 @@ public class Room
         Turn++;
         return 0;
     }
-
-
-
-    // TODO : 오목은 2인용으로 해당 함수들을 수정 ? 안해도 작동은 된다.
-    // 옵저버 기능을 고려하여 놔둘것인지.
-
-    // 새 유저 입장 전 -> 방에 있는 유저들의 정보를, 들어올 사람 에게 보낸다.
-    // 방에 새로 들어올 유저에게 현재 방에 있는 모든 유저의 정보를 전송한다.
-    // 아래는 채팅 기능 추가할 시, 로직.
-    // public void SendNotifyPacketUserList(string userNetSessionID)
-    // {
-    //     var packet = new PKTNtfRoomUserList();
-    //     foreach (var user in _userList)
-    //     {
-    //         packet.UserIDList.Add(user.UserID);
-    //     }
-
-    //     var bodyData = MessagePackSerializer.Serialize(packet);
-    //     var sendPacket = PacketToBytes.Make(PacketId.NtfRoomUserList, bodyData);
-
-    //     MainServer.s_MainLogger.Debug($"당신은 새 유저. 방에 있는 사람들 정보를 보냅니다.");
-
-    //     NetSendFunc(userNetSessionID, sendPacket);
-    // }
-
-    // // 새 유저 입장 처리 후 -> newUserNetSessionID (새 유저) 를 제외한 방에 있는 유저들에게 알림 패킷을 보낸다
-    // // 방에 새로 들어오는 유저의 정보를 보낸다(이미 방에 있는 사람들에게 보낸다)
-    // public void SendNotifyPacketNewUser(string newUserNetSessionID, string newUserID)
-    // {
-    //     var packet = new PKTNtfRoomNewUser();
-    //     packet.UserID = newUserID;
-
-    //     var bodyData = MessagePackSerializer.Serialize(packet);
-    //     var sendPacket = PacketToBytes.Make(PacketId.NtfRoomNewUser, bodyData);
-
-    //     MainServer.s_MainLogger.Debug($"방에 새 유저가 들어왔습니다. UserID: {newUserID}");
-
-    //     Broadcast(newUserNetSessionID, sendPacket);
-    // }
-
-    // 나가는 유저 퇴장 처리 및 userId를 저장. 해당 id로 방에 남은 유저들에게 알림 패킷을 보낸다
-    // 방에서 나가는 유저의 정보를 보낸다(아직 방에 있는 사람들에게 보낸다)
     public void SendNotifyPacketLeaveUser(string userID)
     {
         if (CurrentUserCount() == 0)
@@ -253,13 +211,11 @@ public class Room
             NetSendFunc(user.NetSessionID, sendPacket);
         }
     }
-
 }
 
 public class RoomUser
 {
     public string UserID { get; private set; }
-
     public string NetSessionID { get; private set; }
 
 

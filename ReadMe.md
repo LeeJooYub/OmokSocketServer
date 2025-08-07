@@ -14,7 +14,7 @@
 - `Client/` : 클라이언트 코드 (WinForms 기반)
 - `ReadMe.md` : 프로젝트 설명 및 체크리스트
 
-## 플레이 방식 (로컬 기반)
+## 플레이 방식 (로컬 기반 설명)
 - SocketServer 폴더에서 Dotnet Run
 - Client 폴더를 두개로 복제.
 - Client 폴더에서 Dotnet Run 

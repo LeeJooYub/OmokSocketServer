@@ -4,7 +4,7 @@
 - 이 프로젝트는 C#, SuperSocketLite를 이용하여 오목 게임을 위한 소켓 서버를 구현하는 것을 목적으로 합니다.
 - 이 프로젝트는 소켓 기반 게임서버 학습을 위한 것입니다.
 - 클라이언트, 서버 모두 구현할 것이고, 각각 다른 폴더에 위치할 것입니다. (서버 : SocketServer, 클라이언트 : Client)
-- 현재 이 폴더 자체는 client 폴더입니다.(서버는 다른 폴더에서 작업중입니다)
+- 현재 이 폴더 자체는 SocketServer 폴더입니다.(서버는 다른 폴더에서 작업중입니다)
 - 서버는 TCP 소켓을 사용하여 클라이언트와 통신합니다.
 - 서버는 SuperSocketLite 라이브러리를 사용하여 소켓 서버 기능을 구현합니다.
 - 클라이언트는 윈폼 기반으로 GUI를 구성할 것입니다. 
@@ -27,10 +27,10 @@ namespace SocketServer;
 ## Current Progress
 
 ### Directory Structure
-- **Game/**: Contains game-related logic, such as `Room` and `RoomManager` for managing game rooms and users.
-- **Network/**: Handles networking logic, including `PacketProcessor` for processing incoming and outgoing packets.
-- **Packet/**: Defines DTOs for packet structures, such as `PKTReqRoomEnter`, `PKTResRoomEnter`, and `PKTNtfRoomLeave`.
-- **Server/**: Contains the main server logic, including `MainServer` for managing server lifecycle and connections.
+- **GameLogic/**: 오목 룰, 오목 판 등의 게임 로직을 포함합니다.
+- **Handlers/**: 클라이언트 요청을 처리하고 응답을 전송하는 핸들러들을 포함합니다.
+- **Packet/**: 패킷 프로세서, DTO, 및 패킷 관련 클래스들을 포함합니다.
+- **Server/**: 
 
 ### Key Implementations
 - **Room Management**:

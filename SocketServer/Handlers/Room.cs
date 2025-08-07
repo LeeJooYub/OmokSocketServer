@@ -1,5 +1,5 @@
 
-using SocketServer.GameState;
+using SocketServer.Managers;
 using SocketServer.Packet;
 using MessagePack;
 
@@ -148,8 +148,8 @@ public class RoomHandler : HandlerBase
                 var sendA = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyA);
                 var sendB = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyB);
 
-                _mainServer.SendData(playerA.sessionID, sendA);
-                _mainServer.SendData(playerB.sessionID, sendB);
+                NetSendFunc(playerA.sessionID, sendA);
+                NetSendFunc(playerB.sessionID, sendB);
                 room.StartGame();
 
 
@@ -179,7 +179,7 @@ public class RoomHandler : HandlerBase
         var bodyData = MessagePackSerializer.Serialize(resRoomEnter);
         var sendData = PacketToBytes.Make(PacketId.ResRoomEnter, bodyData);
 
-        _mainServer.SendData(sessionID, sendData);
+        NetSendFunc(sessionID, sendData);
     }
 
     // 방에서 나가겠다는 요청 처리
@@ -257,7 +257,7 @@ public class RoomHandler : HandlerBase
         var bodyData = MessagePackSerializer.Serialize(resRoomLeave);
         var sendData = PacketToBytes.Make(PacketId.ResRoomLeave, bodyData);
 
-        _mainServer.SendData(sessionID, sendData);
+        NetSendFunc(sessionID, sendData);
     }
     
     public void HandleNotifyLeaveInternal(ServerPacketData packetData)

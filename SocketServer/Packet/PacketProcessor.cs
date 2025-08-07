@@ -1,6 +1,6 @@
 using System.Threading.Tasks.Dataflow;
 using SocketServer.Packet;
-using SocketServer.GameState;
+using SocketServer.Managers;
 using SocketServer.Handlers;
 
 namespace SocketServer.Packet;
@@ -70,7 +70,7 @@ public class PacketProcessor
         _roomManager = mainServer._roomManager;
 
         // 핸들러 초기화
-        RegisterPacketHandlers(mainServer);
+        RegisterPacketHandlers(mainServer.SendData,mainServer.Distribute);
     }
 
     // 패킷 라우팅 시작
@@ -100,14 +100,15 @@ public class PacketProcessor
         }
     }
 
-    void RegisterPacketHandlers(MainServer mainServer)
+    void RegisterPacketHandlers(Func<string, byte[], bool> netSendFunc, Action<ServerPacketData> distributeFunc)
     {
-        _connectionHandler.Init(mainServer, _userManager, _roomManager);
+        // 핸들러 초기화
+        _connectionHandler.Init(netSendFunc, distributeFunc, _userManager, _roomManager);
+        _roomHandler.Init(netSendFunc, distributeFunc, _userManager, _roomManager);
+
+        // 핸들러 등록
         _connectionHandler.RegisterPacketHandler(_packetHandlerMap);
-
-        _roomHandler.Init(mainServer, _userManager, _roomManager);
         _roomHandler.RegisterPacketHandler(_packetHandlerMap);
-
     }
 
 

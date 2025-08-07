@@ -1,20 +1,22 @@
 using SocketServer.Packet;
-using SocketServer.GameState;
+using SocketServer.Managers;
 
 namespace SocketServer.Handlers;
 
 public abstract class HandlerBase
 {
-    protected MainServer _mainServer;
+    protected Func<string, byte[], bool> NetSendFunc;
+    protected Action<ServerPacketData> DistributeFunc; 
     protected UserManager _userManager = null;
     protected RoomManager _roomManager = null;
 
 
     public abstract void RegisterPacketHandler(Dictionary<int, Action<ServerPacketData>> packetHandlerMap);
 
-    public void Init(MainServer mainServer, UserManager userManager, RoomManager roomManager)
+    public void Init(Func<string, byte[], bool> netSendFunc, Action<ServerPacketData> distributeFunc, UserManager userManager, RoomManager roomManager)
     {
-        _mainServer = mainServer;
+        NetSendFunc = netSendFunc;
+        DistributeFunc = distributeFunc;
         _userManager = userManager;
         _roomManager = roomManager;
     }
