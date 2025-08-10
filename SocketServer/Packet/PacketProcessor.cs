@@ -48,10 +48,6 @@ public class PacketProcessor
     Dictionary<int, Action<ServerPacketData>> _packetHandlerMap = new Dictionary<int, Action<ServerPacketData>>();
 
 
-    //List
-    List<Room> _roomList = new List<Room>();
-
-
     //Managers
     UserManager _userManager = null;
     RoomManager _roomManager = null;
@@ -68,9 +64,9 @@ public class PacketProcessor
         // 필요한 매니저 주입받아서 초기화
         _userManager = mainServer._userManager;
         _roomManager = mainServer._roomManager;
-
+        
         // 핸들러 초기화
-        RegisterPacketHandlers(mainServer.SendData,mainServer.Distribute);
+        RegisterPacketHandlers(mainServer.SendData, mainServer.Distribute, mainServer.GetSessionCount);
     }
 
     // 패킷 라우팅 시작
@@ -100,11 +96,14 @@ public class PacketProcessor
         }
     }
 
-    void RegisterPacketHandlers(Func<string, byte[], bool> netSendFunc, Action<ServerPacketData> distributeFunc)
+    void RegisterPacketHandlers(
+        Func<string, byte[], bool> netSendFunc,
+        Action<ServerPacketData> distributeFunc,
+        Func<int> getSessionCountFunc)
     {
         // 핸들러 초기화
-        _connectionHandler.Init(netSendFunc, distributeFunc, _userManager, _roomManager);
-        _roomHandler.Init(netSendFunc, distributeFunc, _userManager, _roomManager);
+        _connectionHandler.Init(netSendFunc, distributeFunc, getSessionCountFunc, _userManager, _roomManager);
+        _roomHandler.Init(netSendFunc, distributeFunc, getSessionCountFunc, _userManager, _roomManager);
 
         // 핸들러 등록
         _connectionHandler.RegisterPacketHandler(_packetHandlerMap);

@@ -24,7 +24,7 @@ public class ConnectionHandler : HandlerBase
 
     public void HandleNotifyInConnectClient(ServerPacketData requestData)
     {
-        
+        MainServer.s_MainLogger.Debug($"Current Connected Session Count: {GetSessionCountFunc()}");
     }
 
     public void HandleNotifyInDisConnectClient(ServerPacketData requestData)
@@ -54,10 +54,10 @@ public class ConnectionHandler : HandlerBase
             _userManager.RemoveUser(sessionID);
         }
 
-        MainServer.s_MainLogger.Debug($"Current Connected Session Count: {_mainServer.SessionCount}");
+        MainServer.s_MainLogger.Debug($"Current Connected Session Count: {GetSessionCountFunc()}");
     }
 
-
+ 
     public void HandleRequestLogin(ServerPacketData packetData)
     {
         var sessionID = packetData.SessionID;

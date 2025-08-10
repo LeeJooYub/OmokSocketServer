@@ -162,6 +162,7 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
         _mainPacketProcessor.PushPacket(requestPacket); // 패킷 처리기에 패킷 삽입
     }
 
+
     // 클라이언트 연결 이벤트 처리
     void OnConnected(ClientSession session)
     {
@@ -196,17 +197,31 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
         Distribute(packet); // 패킷 분배
     }
 
-
+    public int GetSessionCount()
+    {
+        var count = this.SessionCount;
+        return count;
+    }
 
     public void StopServer()
     {
         _mainPacketProcessor.Destroy();
         Stop();
     }
+    
+
 
 }
 
 
 public class ClientSession : AppSession<ClientSession, EFBinaryRequestInfo>
 {
+}
+
+public class SessionManager
+{
+    public string SessionID { get; set; }
+
+
+
 }
