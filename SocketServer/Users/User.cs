@@ -1,6 +1,6 @@
 
 
-namespace SocketServer.Managers;
+namespace SocketServer.Users;
 
 
 /// 유저 클래스

@@ -7,8 +7,9 @@ using MessagePack;
 
 using SocketServer.Packet;
 using SocketServer.GameLogic;
+using SocketServer.Users;
 
-namespace SocketServer.Managers;
+namespace SocketServer.Room;
 
 public class Room
 {

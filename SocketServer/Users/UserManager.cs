@@ -2,7 +2,7 @@
 
 using SocketServer;
 
-namespace SocketServer.Managers;
+namespace SocketServer.Users;
 
 /// <summary>
 /// 유저 관리자 클래스

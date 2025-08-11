@@ -7,9 +7,11 @@ using SuperSocketLite.SocketBase;
 using SuperSocketLite.SocketBase.Protocol;
 using SuperSocketLite.SocketBase.Config;
 
-using SocketServer.Managers;
+using SocketServer.Users;
+using SocketServer.Room;
 using SocketServer.Handlers;
 using SocketServer.Packet;
+using System.Net.Sockets;
 
 /*
  [동작 예시]
@@ -111,7 +113,7 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
 
     public void InitManagers()
     {
-        Room.NetSendFunc = this.SendData;
+        SocketServer.Room.Room.NetSendFunc = this.SendData;
         _roomManager.CreateRooms();
 
         var maxUserCount = s_ServerOption.RoomMaxCount * s_ServerOption.RoomMaxUserCount;
