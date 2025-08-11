@@ -71,6 +71,216 @@
 
 ---
 
+## 클래스 다이어그램
+
+'''mermaid
+classDiagram
+    %% SuperSocket 기본 클래스들
+    class AppServer~ClientSession, EFBinaryRequestInfo~
+    class AppSession~ClientSession, EFBinaryRequestInfo~
+    class IRequestInfo
+    
+    %% 서버 관련 클래스
+    class MainServer {
+        +static ILog s_MainLogger
+        +static ServerOption s_ServerOption
+        +IServerConfig _config
+        +PacketProcessor _mainPacketProcessor
+        +RoomManager _roomManager
+        +UserManager _userManager
+        +MainServer()
+        +InitConfig(ServerOption)
+        +CreateServer()
+        +InitLogger()
+        +InitManagers()
+        +InitComponent() ErrorCode
+        +SendData(string, byte[]) bool
+        +Distribute(ServerPacketData)
+        -OnConnected(ClientSession)
+        -OnClosed(ClientSession, CloseReason)
+        -OnPacketReceived(ClientSession, EFBinaryRequestInfo)
+        +GetSessionCount() int
+        +StopServer()
+    }
+    
+    class ClientSession {
+    }
+    
+    class EFBinaryRequestInfo {
+        +int PacketSize
+        +int PacketID
+        +short Dummy
+        +byte[] Body
+        +int TotalSize
+    }
+    
+    class ReceiveFilter
+    
+    %% 패킷 처리 관련 클래스
+    class PacketProcessor {
+        -bool _isThreadRunning
+        -Thread _processThread
+        +BufferBlock~ServerPacketData~ _packetBuffer
+        +Dictionary~int, Action~ _packetHandlerMap
+        -UserManager _userManager
+        -RoomManager _roomManager
+        -ConnectionHandler _connectionHandler
+        -RoomHandler _roomHandler
+        +Create(MainServer)
+        +Start()
+        +Destroy()
+        +PushPacket(ServerPacketData)
+        -Process()
+        -RegisterPacketHandlers(Func, Action, Func)
+    }
+    
+    class ServerPacketData {
+        +string SessionID
+        +int PacketSize
+        +int PacketID
+        +short Dummy
+        +byte[] BodyData
+        +static MakeNTFInConnectOrDisConnectClientPacket(bool, string)
+    }
+    
+    %% 핸들러 관련 클래스
+    class HandlerBase {
+        #Func~string, byte[], bool~ NetSendFunc
+        #Action~ServerPacketData~ DistributeFunc
+        #Func~int~ GetSessionCountFunc
+        #UserManager _userManager
+        #RoomManager _roomManager
+        +abstract RegisterPacketHandler(Dictionary~int, Action~)
+        +Init(Func, Action, Func, UserManager, RoomManager)
+    }
+    
+    class ConnectionHandler {
+        +RegisterPacketHandler(Dictionary~int, Action~)
+        +HandleLogin(ServerPacketData)
+        +SendResponseToClient(ErrorCode, string, string)
+    }
+    
+    class RoomHandler {
+        +RegisterPacketHandler(Dictionary~int, Action~)
+        +HandleRequestRoomEnter(ServerPacketData)
+        +HandleRequestRoomLeave(ServerPacketData)
+        +HandleRequestMoveStone(ServerPacketData)
+        +HandleRequestMatchMake(ServerPacketData)
+    }
+    
+    %% 관리자 클래스
+    class RoomManager {
+        +List~Room~ _roomList
+        +List~(string, string)~ _matchWaitingQueue
+        +CreateRooms()
+        +GetRoom(int)
+        +GetEmptyRoom()
+    }
+    
+    class UserManager {
+        +Dictionary~string, User~ _userSessionDic
+        +Dictionary~string, User~ _userIdDic
+        +Init(int)
+        +GetUser(string)
+        +AddUser(string, string)
+        +RemoveUser(string)
+    }
+    
+    %% 게임 상태 관련 클래스
+    class Room {
+        +int Number
+        +int Turn
+        +bool IsGameStart
+        +static Func~string, byte[], bool~ NetSendFunc
+        +AddUser(string, string)
+        +RemoveUser(RoomUser)
+        +PlayerMove(int, int)
+        +SendNotifyPlayerMove(int, int, bool, char)
+        +InitializeGameStatus()
+        +GetPlayerColor(string)
+    }
+    
+    class User {
+        +string UserID
+        +string SessionID
+        +int RoomNumber
+        +bool IsConfirm(string)
+        +bool IsStateRoom()
+        +void EnteredRoom(int)
+        +void LeaveRoom()
+    }
+    
+    class RoomUser {
+        +string UserID
+        +string NetSessionID
+        +void Set(string, string)
+    }
+    
+    %% 게임 로직 관련 클래스
+    class OmokRule {
+        +CheckWinCondition(OmokBoard, int, int)
+    }
+    
+    class OmokBoard {
+        +int[,] Board
+        +PlaceStone(int, int, int)
+        +Initialize()
+    }
+    
+    %% 설정 관련 클래스
+    class ServerOption {
+        +string Name
+        +int Port
+        +int MaxRequestLength
+        +int MaxConnectionNumber
+        +int RoomMaxCount
+        +int RoomMaxUserCount
+    }
+    
+    class ErrorCode {
+        +None
+        +RoomEnterInvalidRoomNumber
+        +RoomEnterAlreadyUser
+        +RoomEnterFullRoom
+        +RoomEnterInvalidUser
+        +RoomEnterInvalidState
+    }
+    
+    %% 클래스 간의 관계
+    AppServer <|-- MainServer
+    AppSession <|-- ClientSession
+    IRequestInfo <|-- EFBinaryRequestInfo
+    
+    MainServer *-- PacketProcessor
+    MainServer *-- RoomManager
+    MainServer *-- UserManager
+    MainServer --> ClientSession
+    
+    RoomManager *-- Room
+    UserManager *-- User
+    
+    Room *-- RoomUser
+    Room *-- OmokBoard
+    Room *-- OmokRule
+    
+    PacketProcessor --> ConnectionHandler
+    PacketProcessor --> RoomHandler
+    PacketProcessor --> ServerPacketData: processes
+    PacketProcessor o-- UserManager
+    PacketProcessor o-- RoomManager
+    
+       %% 관계 정의
+    HandlerBase <|-- ConnectionHandler
+    HandlerBase <|-- RoomHandler
+    
+    MainServer --> ServerOption
+
+
+
+
+
+--
+
 # 체크리스트 (개발 순서)
 
 ## 0. 학습

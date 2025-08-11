@@ -50,6 +50,8 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
     public UserManager _userManager = new UserManager();
 
 
+// -------------initializations----------------
+
     // MainServer 클래스의 새 인스턴스를 초기화합니다.
     public MainServer()
         : base(new DefaultReceiveFilterFactory<ReceiveFilter, EFBinaryRequestInfo>())
@@ -128,6 +130,14 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
         return ErrorCode.None;
     }
 
+
+
+
+// ------------Network----------------
+
+
+
+
     // 네트워크로 패킷을 보낸다
     public bool SendData(string sessionID, byte[] sendData)
     {
@@ -155,12 +165,17 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
         return true; // 성공 반환
     }
 
-
     // 패킷처리기로 패킷을 전달한다 (버퍼로 전달)
     public void Distribute(ServerPacketData requestPacket)
     {
         _mainPacketProcessor.PushPacket(requestPacket); // 패킷 처리기에 패킷 삽입
     }
+
+
+
+
+// ------------SuperSocket Events System ---------------
+
 
 
     // 클라이언트 연결 이벤트 처리
@@ -197,6 +212,14 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
         Distribute(packet); // 패킷 분배
     }
 
+
+
+
+
+// -----------Extral Methods & Deconstructors----------------
+
+
+
     public int GetSessionCount()
     {
         var count = this.SessionCount;
@@ -216,12 +239,4 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
 
 public class ClientSession : AppSession<ClientSession, EFBinaryRequestInfo>
 {
-}
-
-public class SessionManager
-{
-    public string SessionID { get; set; }
-
-
-
 }
