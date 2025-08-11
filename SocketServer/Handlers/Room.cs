@@ -30,7 +30,7 @@ public class RoomHandler : HandlerBase
     // 착수 요청 핸들러
     public void HandleRequestMoveStone(ServerPacketData packetData)
     {
-        MainServer.s_MainLogger.Debug("HandleRequestMoveStone 핸들러 호출");
+        MainServer.s_MainLogger.Debug("RoomHandler -> HandleRequestMoveStone 핸들러 호출");
         var sessionID = packetData.SessionID;
         var user = _userManager.GetUser(sessionID);
         if (user == null || user.IsConfirm(sessionID) == false )
@@ -85,7 +85,7 @@ public class RoomHandler : HandlerBase
     {
         var sessionID = packetData.SessionID;
         var user = _userManager.GetUser(sessionID);
-        MainServer.s_MainLogger.Debug($"HandleRequestMatchMake 핸들러 호출: {sessionID}");
+        MainServer.s_MainLogger.Debug($"RoomHandler -> HandleRequestMatchMake 핸들러 호출: {sessionID}");
         if (user == null || user.IsConfirm(sessionID) == false)
         {
             MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - Invalid user. SessionID: {sessionID}");
@@ -114,6 +114,14 @@ public class RoomHandler : HandlerBase
                 int first = rnd.Next(2); // 0 또는 1
                 var playerA = _roomManager._matchWaitingQueue[0];
                 var playerB = _roomManager._matchWaitingQueue[1];
+
+                // 매치메이킹 전에 두 유저가 여전히 유효한지 확인
+                if (_userManager.GetUser(playerA.sessionID) == null || _userManager.GetUser(playerB.sessionID) == null)
+                {
+                    // 유효하지 않은 유저 제거 후 다시 시도
+                    _roomManager._matchWaitingQueue.RemoveAll(p => _userManager.GetUser(p.sessionID) == null);
+                    return;
+                }
 
                 var colorA = 'W';
                 var colorB = 'B';
@@ -186,7 +194,7 @@ public class RoomHandler : HandlerBase
     public void HandleRequestLeave(ServerPacketData packetData)
     {
         var sessionID = packetData.SessionID;
-        MainServer.s_MainLogger.Debug("게임 방 벗어나기 요청");
+        MainServer.s_MainLogger.Debug("Room Handler -> HandleRequestLeave 핸들러 호출: " + sessionID);
 
         try
         {

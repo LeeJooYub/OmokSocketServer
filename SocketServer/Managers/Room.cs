@@ -118,23 +118,7 @@ public class Room
         return true;
     }
 
-    // public void SendNotifyPacketGameEnd()
-    // {
-    //     var packet = new PKTNtfGameEnd();
-    //     packet.RoomNumber = Number;
-
-    //     var bodyData = MessagePackSerializer.Serialize(packet);
-    //     var sendPacket = PacketToBytes.Make(PacketId.NtfRoomGameEnd, bodyData);
-
-    //     MainServer.s_MainLogger.Debug($"방 {Number}에서 게임 종료 알림을 보냅니다.");
-
-    //     foreach (var user in _userList)
-    //     {
-    //         NetSendFunc(user.NetSessionID, sendPacket);
-    //     }
-    // }
-
-    // 플레이어에게 착수 패킷을 받으면, 이를 확인 후에, 서버에서 플레이어 착수 반영 확인 및 게임 종료 판단 여부 패킷을 보낸다.
+    // 플레이어에게 착수 반영 후, 현재 게임 상황 정보, 턴 정보, 게임 종료 여부 등을 알리는 패킷을 전송한다.
     public void SendNotifyPlayerMove(int x, int y, bool isGameEnd, char winnerColor)
     {
         var packet = new PKTNtfGamePlayerMove();

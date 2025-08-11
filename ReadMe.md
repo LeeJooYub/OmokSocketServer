@@ -73,7 +73,7 @@
 
 ## 클래스 다이어그램
 
-'''mermaid
+```mermaid
 classDiagram
     %% SuperSocket 기본 클래스들
     class AppServer~ClientSession, EFBinaryRequestInfo~
@@ -274,12 +274,172 @@ classDiagram
     HandlerBase <|-- RoomHandler
     
     MainServer --> ServerOption
+```
+
+---
+## 시퀸스 다이어그램
+
+### 1. 연결 , 로그인, 연결 해제
+```mermaid
+sequenceDiagram
+    participant Client as 클라이언트
+    participant AppServer as MainServer
+    participant PP as PacketProcessor
+    participant CH as ConnectionHandler
+    participant RH as RoomHandler
+    participant RM as RoomManager
+    participant Room as Room
+    participant UM as UserManager
+    participant User as User
+    participant OR as OmokRule
+
+    %% 연결 및 로그인 과정
+    Client->>AppServer: TCP 연결 요청
+    activate AppServer
+    AppServer->>AppServer: OnConnected(session)
+    AppServer->>PP: Distribute(NtfInConnectClient)
+    activate PP
+    PP->>CH: HandleNotifyInConnectClient(packet)
+    activate CH
+    CH->>CH: 연결 정보 로깅
+    deactivate CH
+    deactivate PP
+
+    %% 로그인 과정
+    Client->>AppServer: ReqLogin(userID)
+    AppServer->>AppServer: OnPacketReceived
+    AppServer->>PP: Distribute(packet)
+    activate PP
+    PP->>CH: HandleRequestLogin(packet)
+    activate CH
+    CH->>UM: AddUser(sessionID, userID)
+    activate UM
+    UM->>User: 생성 및 초기화
+    UM-->>CH: 성공/실패
+    deactivate UM
+    CH->>Client: ResLogin(결과)
+    deactivate CH
+    deactivate PP
+    
+    %% 연결 종료
+    Client->>AppServer: 연결 종료
+    AppServer->>AppServer: OnClosed(session)
+    AppServer->>PP: Distribute(NtfInDisconnectClient)
+    activate PP
+    PP->>CH: HandleNotifyInDisConnectClient(packet)
+    activate CH
+    CH->>UM: GetUser(sessionID)
+    
+    alt 방에 있었던 경우
+        CH->>PP: Distribute(NtfInRoomLeave)
+        PP->>RH: HandleNotifyLeaveInternal(packet)
+        activate RH
+        RH->>RM: GetRoom(roomNum)
+        RH->>Room: RemoveUser(user)
+        RH->>Room: 남은 유저에게 퇴장 알림
+        deactivate RH
+    end
+    
+    CH->>UM: RemoveUser(sessionID)
+    deactivate CH
+    deactivate PP
+    AppServer-->>Client: 연결 종료
+    deactivate AppServer
+```
+
+### 2. 게임 진행
+```mermaid
+sequenceDiagram
+    participant Client as 클라이언트
+    participant AppServer as MainServer
+    participant PP as PacketProcessor
+    participant CH as ConnectionHandler
+    participant RH as RoomHandler
+    participant RM as RoomManager
+    participant Room as Room
+    participant UM as UserManager
+    participant User as User
+    participant OR as OmokRule
+    
+    %% 매치메이킹 요청
+    Client->>AppServer: REQ_MATCH_MAKE
+    AppServer->>AppServer: OnPacketReceived
+    AppServer->>PP: Distribute(packet)
+    activate PP
+    PP->>RH: HandleRequestMatchMake(packet)
+    activate RH
+    RH->>UM: GetUser(sessionID)
+    RH->>RM: _matchWaitingQueue.Add(user)
+    
+    alt 매치 가능한 경우 (큐에 2명 이상)
+        RH->>RM: GetEmptyRoom()
+        activate RM
+        RM-->>RH: room
+        deactivate RM
+        RH->>Room: AddUser(userID, sessionID) x 2명
+        activate Room
+        Room-->>RH: 성공
+        deactivate Room
+        RH->>UM: EnteredRoom(roomNum) x 2명
+        RH->>Client: RES_MATCH_MAKE(성공, 색상정보)
+    end
+    deactivate RH
+    deactivate PP
+
+    %% 게임 진행 (착수)
+    Client->>AppServer: REQ_PUT_STONE(x, y)
+    AppServer->>AppServer: OnPacketReceived
+    AppServer->>PP: Distribute(packet)
+    activate PP
+    PP->>RH: HandleRequestMoveStone(packet)
+    activate RH
+    RH->>UM: GetUser(sessionID)
+    RH->>UM: IsStateRoom()
+    RH->>RM: GetRoom(roomNum)
+    RH->>Room: GetPlayerColor(userID)
+    RH->>Room: PlayerMove(x, y, color)
+    activate Room
+    Room->>OR: CheckWinCondition(board, x, y)
+    activate OR
+    OR-->>Room: 승패 결과
+    deactivate OR
+
+    alt 게임 계속 (승패 없음)
+        Room->>Room: Turn++
+        Room-->>RH: result=0
+        RH->>Room: SendNotifyPlayerMove(x, y, false, ' ')
+        Room->>Client: NTF_GAME_PLAYER_MOVE(x, y, turn, false, ' ')
+        activate Client
+        Client->>Client: HandleMoveStone(data)
+        Client->>Client: 상대방 돌 표시(board[x,y]=color)
+        Client->>Client: 턴 업데이트(Turn=res.Turn)
+        Client->>Client: Invalidate() (화면 갱신)
+        deactivate Client
+    else 게임 종료 (승리자 발생)
+        Room->>Room: 게임 종료 처리(IsGameStart=false)
+        Room-->>RH: result=1 or 2
+        RH->>Room: SendNotifyPlayerMove(x, y, true, winnerColor)
+        Room->>Client: NTF_GAME_PLAYER_MOVE(x, y, turn, true, winnerColor)
+        activate Client
+        Client->>Client: HandleMoveStone(data)
+        Client->>Client: 마지막 돌 표시(board[x,y]=color)
+        Client->>Client: GameEnd(winnerColor) 호출
+        Client->>Client: 승리 메시지 표시(MessageBox.Show)
+        Client->>Client: 게임창 닫기(DialogResult=OK, Close())
+        deactivate Client
+        RH->>Room: InitializeGameStatus()
+        Room->>Room: 보드, 턴 초기화
+    end
+    deactivate Room
+    deactivate RH
+    deactivate PP
+```
 
 
 
 
 
---
+---
 
 # 체크리스트 (개발 순서)
 
@@ -309,9 +469,9 @@ classDiagram
 - ✅ 게임 결과 및 후처리 로직 추가 (서버 , 클라이언트)
 
 ## 3. 코드 리팩토링 , 예외/에러 처리 및 유지보수 
-- ⬜ 코드 리뷰 후, 필요한 부분 리팩토링
-- ⬜ 디렉토리 구조 정리
-- ⬜ 문서 정리 (시퀀스 다이어그램, 클래스 다이어그램 작성)
+- ✅ 코드 리뷰 후, 필요한 부분 리팩토링
+- ✅ 디렉토리 구조 정리
+- ✅ 문서 정리 (시퀀스 다이어그램, 클래스 다이어그램 작성)
 
 ## 4. 예외/에러 처리 및 유지보수 
 - ⬜ 예외/에러 핸들링 및 사용자 알림
