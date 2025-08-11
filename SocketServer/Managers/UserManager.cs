@@ -38,7 +38,7 @@ public class UserManager
         ++_userSeq;
 
         var user = new User();
-        user.Set(_userSeq, sessionID, userID);
+        user.Set(sessionID, userID);
         _userMap.Add(sessionID, user);
 
         return ErrorCode.None;

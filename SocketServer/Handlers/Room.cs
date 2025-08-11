@@ -260,7 +260,7 @@ public class RoomHandler : HandlerBase
             return false;
         }
 
-        var userID = roomUser.UserID;
+        var userID = roomUser.GetUserID();
         room.RemoveUser(roomUser);
 
         room.SendNotifyPacketLeaveUser(userID);
