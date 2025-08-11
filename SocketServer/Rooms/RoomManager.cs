@@ -1,4 +1,4 @@
-namespace SocketServer.Managers;
+namespace SocketServer.Room;
 
 
 // 방 관리 클래스

@@ -2,7 +2,7 @@
 
 using SocketServer;
 
-namespace SocketServer.Managers;
+namespace SocketServer.Users;
 
 /// <summary>
 /// 유저 관리자 클래스
@@ -38,7 +38,7 @@ public class UserManager
         ++_userSeq;
 
         var user = new User();
-        user.Set(_userSeq, sessionID, userID);
+        user.Set(sessionID, userID);
         _userMap.Add(sessionID, user);
 
         return ErrorCode.None;

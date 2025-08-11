@@ -1,5 +1,5 @@
 
-using SocketServer.Managers;
+using SocketServer.Room;
 using SocketServer.Packet;
 using MessagePack;
 
@@ -260,7 +260,7 @@ public class RoomHandler : HandlerBase
             return false;
         }
 
-        var userID = roomUser.UserID;
+        var userID = roomUser.GetUserID();
         room.RemoveUser(roomUser);
 
         room.SendNotifyPacketLeaveUser(userID);

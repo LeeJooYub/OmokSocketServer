@@ -1,13 +1,11 @@
 
 
-namespace SocketServer.Managers;
+namespace SocketServer.Users;
 
 
 /// 유저 클래스
 public class User
 {
-    // 서버에 연결시 시퀀스 부여. 0이면 연결되지 않은 상태
-    UInt64 _userSeq = 0;
     // 연결된 세션 ID
     string _sessionID;
     // 유저가 속한 방 번호. -1이면 방에 속하지 않음
@@ -15,10 +13,16 @@ public class User
     // 유저 ID
     string _userID;
 
+    public User() { }
 
-    public void Set(UInt64 userSeq, string sessionID, string userID)
+    public User(string userID, string sessionID)
     {
-        _userSeq = userSeq;
+        _userID = userID;
+        _sessionID = sessionID;
+    }
+
+    public void Set(string sessionID, string userID)
+    {
         _sessionID = sessionID;
         _userID = userID;
     }
@@ -35,6 +39,11 @@ public class User
         return _userID;
     }
 
+    public string GetSessionID()
+    {
+        return _sessionID;
+    }   
+
     public void EnteredRoom(int roomNumber)
     {
         this.RoomNumber = roomNumber;
@@ -47,7 +56,7 @@ public class User
 
     public bool IsStateLogin()
     {
-        var isLogin = _userSeq != 0;
+        var isLogin = RoomNumber != -1;
         return isLogin;
     }
 

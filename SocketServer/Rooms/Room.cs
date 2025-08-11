@@ -7,8 +7,9 @@ using MessagePack;
 
 using SocketServer.Packet;
 using SocketServer.GameLogic;
+using SocketServer.Users;
 
-namespace SocketServer.Managers;
+namespace SocketServer.Room;
 
 public class Room
 {
@@ -16,7 +17,7 @@ public class Room
     public int Number { get; set; }
     public int Turn { get; set; } = 0; // 현재 턴. 게임 시작 전 = 0, 게임 시작 후 = 1, 2, ...
     int _maxUserCount = 2; // 기본 최대 사용자 수
-    List<RoomUser> _userList = new List<RoomUser>(); // 방에 있는 유저 리스트. 0은 백. 1은 흑.
+    List<User> _userList = new List<User>(); // 방에 있는 유저 리스트. 0은 백. 1은 흑.
     bool IsGameStart = false;
     OmokBoard omokBoard = new OmokBoard(); // 오목 보드 인스턴스
     OmokRule omokRule = new OmokRule(); // 오목 룰 인스턴스
@@ -40,9 +41,8 @@ public class Room
             return false;
         }
 
-        var roomUser = new RoomUser();
-        roomUser.Set(userID, netSessionID);
-        _userList.Add(roomUser);
+        var user = new User(userID, netSessionID);
+        _userList.Add(user);
 
         return true;
 
@@ -54,18 +54,18 @@ public class Room
 
     public void RemoveUser(string netSessionID)
     {
-        var index = _userList.FindIndex(x => x.NetSessionID == netSessionID);
+        var index = _userList.FindIndex(x => x.GetSessionID() == netSessionID);
         _userList.RemoveAt(index);
     }
 
-    public bool RemoveUser(RoomUser user)
+    public bool RemoveUser(User user)
     {
         return _userList.Remove(user);
     }
 
-    public RoomUser GetUser(string userID)
+    public User GetUser(string userID)
     {
-        RoomUser? user = _userList.Find(x => x.UserID == userID);
+        User? user = _userList.Find(x => x.GetUserID() == userID);
         return user;
     }
 
@@ -75,7 +75,7 @@ public class Room
         for (int i = 0; i < _userList.Count; i++)
         {
             var user = _userList[i];
-            if (user.UserID == userId)
+            if (user.GetUserID() == userId)
             {
                 return i + 1; // 백은 1, 흑은 2
             }
@@ -83,9 +83,9 @@ public class Room
         return 0; // 유저가 방에 없음
     }
 
-    public RoomUser GetUserByNetSessionId(string netSessionID)
+    public User GetUserByNetSessionId(string netSessionID)
     {
-        RoomUser? user = _userList.Find(x => x.NetSessionID == netSessionID);
+        User? user = _userList.Find(x => x.GetSessionID() == netSessionID);
         return user;
     }
 
@@ -190,27 +190,16 @@ public class Room
     {
         foreach (var user in _userList)
         {
-            if (user.NetSessionID == excludeNetSessionID)
+            if (user.GetSessionID() == excludeNetSessionID)
             {
                 continue;
             }
 
-            NetSendFunc(user.NetSessionID, sendPacket);
+            NetSendFunc(user.GetSessionID(), sendPacket);
         }
     }
 }
 
-public class RoomUser
-{
-    public string UserID { get; private set; }
-    public string NetSessionID { get; private set; }
 
-
-    public void Set(string userID, string netSessionID)
-    {
-        UserID = userID;
-        NetSessionID = netSessionID;
-    }
-}
 
 
