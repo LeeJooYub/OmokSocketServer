@@ -435,7 +435,69 @@ sequenceDiagram
     deactivate PP
 ```
 
-
+### 3. 패킷 흐름도
+```mermaid
+graph LR
+    %% 주요 컴포넌트 정의
+    Client[클라이언트]
+    MainServer[MainServer]
+    PacketProcessor[PacketProcessor]
+    ConnHandler[ConnectionHandler]
+    RoomHandler[RoomHandler]
+    UserManager[UserManager]
+    RoomManager[RoomManager]
+    Room[Room]
+    
+    %% 정보 흐름
+    Client <--패킷 송수신--> MainServer
+    
+    MainServer --패킷 분배--> PacketProcessor
+    PacketProcessor --패킷 위임--> ConnHandler
+    PacketProcessor --패킷 위임--> RoomHandler
+    
+    %% 델리게이트 주입 관계
+    MainServer -.SendData()-.-> ConnHandler
+    MainServer -.Distribute()-.-> ConnHandler
+    MainServer -.GetSessionCount()-.-> ConnHandler
+    
+    MainServer -.SendData()-.-> RoomHandler
+    MainServer -.Distribute()-.-> RoomHandler
+    MainServer -.GetSessionCount()-.-> RoomHandler
+    
+    MainServer -.SendData()-.-> Room
+    
+    %% 컴포넌트 간 정보 흐름
+    ConnHandler --유저 관리--> UserManager
+    RoomHandler --방 관리--> RoomManager
+    RoomHandler --유저 정보 조회--> UserManager
+    
+    RoomHandler --방 입장/퇴장/착수--> RoomManager
+    RoomManager --방 객체 접근--> Room
+    
+    %% 서버 내부 알림
+    ConnHandler --연결 해제 알림--> RoomHandler
+    ConnHandler --로그인 결과--> Client
+    
+    RoomHandler --매치메이킹 결과--> Client
+    RoomHandler --착수 알림--> Client
+    RoomHandler --게임 종료 알림--> Client
+    
+    %% 스타일
+    classDef core fill:#f96,stroke:#333,stroke-width:2px
+    classDef handler fill:#9cf,stroke:#333,stroke-width:1px
+    classDef manager fill:#9f9,stroke:#333,stroke-width:1px
+    classDef entity fill:#f9f,stroke:#333,stroke-width:1px
+    classDef external fill:#ccc,stroke:#333,stroke-width:1px
+    
+    class MainServer,PacketProcessor core
+    class ConnHandler,RoomHandler handler
+    class UserManager,RoomManager manager
+    class Room entity
+    class Client external
+    
+    %% 특별 연결: 델리게이트 주입
+    linkStyle 7,8,9,10,11,12,13 stroke-dasharray: 5 5, stroke: #999
+```
 
 
 

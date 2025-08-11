@@ -20,6 +20,7 @@ public class Room
     bool IsGameStart = false;
     OmokBoard omokBoard = new OmokBoard(); // 오목 보드 인스턴스
     OmokRule omokRule = new OmokRule(); // 오목 룰 인스턴스
+
     // 인스턴스 생성시, supersocket의 Send 메소드를 받아서 초기화
     public static Func<string, byte[], bool> NetSendFunc;
 
@@ -118,27 +119,6 @@ public class Room
         return true;
     }
 
-    // 플레이어에게 착수 반영 후, 현재 게임 상황 정보, 턴 정보, 게임 종료 여부 등을 알리는 패킷을 전송한다.
-    public void SendNotifyPlayerMove(int x, int y, bool isGameEnd, char winnerColor)
-    {
-        var packet = new PKTNtfGamePlayerMove();
-        packet.X = x;
-        packet.Y = y;
-        packet.Turn = Turn;
-        packet.IsGameEnd = isGameEnd;
-        packet.WinnerColor = winnerColor;
-
-        var bodyData = MessagePackSerializer.Serialize(packet);
-        var sendPacket = PacketToBytes.Make(PacketId.NTF_GAME_PLAYER_MOVE, bodyData);
-
-        MainServer.s_MainLogger.Debug($"방 {Number}에서 플레이어 이동 알림 혹은 게임 종료 안내 패킷을 보냅니다. X: {x}, Y: {y}, 턴: {Turn}");
-
-        foreach (var user in _userList)
-        {
-            NetSendFunc(user.NetSessionID, sendPacket);
-        }
-    }
-
     //playerNum 1: 백, 2: 흑
     //0 반환시, 승패 결정 안남.
     public int PlayerMove(int x, int y, int playerNum)
@@ -163,6 +143,29 @@ public class Room
         Turn++;
         return 0;
     }
+
+
+    // 플레이어에게 착수 반영 후, 현재 게임 상황 정보, 턴 정보, 게임 종료 여부 등을 알리는 패킷을 전송한다.
+    public void SendNotifyPlayerMove(int x, int y, bool isGameEnd, char winnerColor)
+    {
+        var packet = new PKTNtfGamePlayerMove();
+        packet.X = x;
+        packet.Y = y;
+        packet.Turn = Turn;
+        packet.IsGameEnd = isGameEnd;
+        packet.WinnerColor = winnerColor;
+
+        var bodyData = MessagePackSerializer.Serialize(packet);
+        var sendPacket = PacketToBytes.Make(PacketId.NTF_GAME_PLAYER_MOVE, bodyData);
+
+        MainServer.s_MainLogger.Debug($"방 {Number}에서 플레이어 이동 알림 혹은 게임 종료 안내 패킷을 보냅니다. X: {x}, Y: {y}, 턴: {Turn}");
+
+        // ""는 제외하는 유저가 없다는 뜻. 모든 유저에게 정보전달.
+        Broadcast("", sendPacket);
+    }
+
+
+
     public void SendNotifyPacketLeaveUser(string userID)
     {
         if (CurrentUserCount() == 0)
@@ -211,22 +214,3 @@ public class RoomUser
 }
 
 
-    // // 매칭 시작 후, 게임 시작 알림 패킷을 방에 있는 모든 유저에게 전송한다.
-    // public void SendNotifyPacketGameStart()
-    // {
-    //     var packet1 = new PKTNtfGameStart();
-    //     packet1.MyStoneColor = 'W';
-    //     var bodyData = MessagePackSerializer.Serialize(packet1);
-    //     var sendPacket = PacketToBytes.Make(PacketId.NTF_GAME_START, bodyData);
-    //     var player1SessionID = _userList[0].NetSessionID;
-    //     NetSendFunc(player1SessionID, sendPacket);
-    //     MainServer.s_MainLogger.Debug($"{_userList[0].UserID} 님에게 게임 시작 알림을 보냅니다. 백돌입니다.");
-
-    //     var packet2 = new PKTNtfGameStart();
-    //     packet2.MyStoneColor = 'B';
-    //     bodyData = MessagePackSerializer.Serialize(packet2);
-    //     sendPacket = PacketToBytes.Make(PacketId.NTF_GAME_START, bodyData);
-    //     var player2SessionID = _userList[1].NetSessionID;
-    //     NetSendFunc(player2SessionID, sendPacket);
-    //     MainServer.s_MainLogger.Debug($"{_userList[1].UserID} 님에게 게임 시작 알림을 보냅니다. 흑돌입니다.");
-    // }

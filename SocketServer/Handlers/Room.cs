@@ -8,7 +8,7 @@ namespace SocketServer.Handlers;
 public class RoomHandler : HandlerBase
 {
 
-    
+
 
     public override void RegisterPacketHandler(Dictionary<int, Action<ServerPacketData>> packetHandlerMap)
     {
@@ -23,9 +23,19 @@ public class RoomHandler : HandlerBase
         // 착수 요청 핸들러
         packetHandlerMap.Add((int)PacketId.REQ_PUT_STONE, HandleRequestMoveStone);
 
-        // 방 퇴장 알림 핸들러
+
+
+
+
+
+        // 방 퇴장 알림 핸들러 (서버 내부에서 사용)
         packetHandlerMap.Add((int)PacketId.NtfInRoomLeave, HandleNotifyLeaveInternal);
     }
+
+
+    // ------------------------------외부 요청 핸들러--------------------------------
+
+
 
     // 착수 요청 핸들러
     public void HandleRequestMoveStone(ServerPacketData packetData)
@@ -33,17 +43,17 @@ public class RoomHandler : HandlerBase
         MainServer.s_MainLogger.Debug("RoomHandler -> HandleRequestMoveStone 핸들러 호출");
         var sessionID = packetData.SessionID;
         var user = _userManager.GetUser(sessionID);
-        if (user == null || user.IsConfirm(sessionID) == false )
+        if (user == null || user.IsConfirm(sessionID) == false)
         {
             MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - Invalid user or state. SessionID: {sessionID}");
-            SendResponseEnterRoomToClient(ErrorCode.RoomEnterInvalidUser, sessionID);
+            SendErrorResponse(ErrorCode.RoomEnterInvalidUser, sessionID);
             return;
         }
 
-        if(user.IsStateRoom() == false)
+        if (user.IsStateRoom() == false)
         {
             MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - User not in room. SessionID: {sessionID}");
-            SendResponseEnterRoomToClient(ErrorCode.RoomEnterInvalidState, sessionID);
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
             return;
         }
 
@@ -51,16 +61,16 @@ public class RoomHandler : HandlerBase
         if (room == null)
         {
             MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - Invalid room. SessionID: {sessionID}, RoomNumber: {user.GetRoomNumber()}");
-            SendResponseEnterRoomToClient(ErrorCode.RoomEnterInvalidState, sessionID);
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
             return;
         }
-        
+
         var playerColor = room.GetPlayerColor(user.GetUserID());
         // 착수 처리
         var req = MessagePackSerializer.Deserialize<PKTReqPutStone>(packetData.BodyData);
         MainServer.s_MainLogger.Debug($"HandleRequestMoveStone: {sessionID}, X: {req.X}, Y: {req.Y}, PlayerColor: {playerColor}");
         var result = room.PlayerMove(req.X, req.Y, playerColor);
-        MainServer.s_MainLogger.Debug($"PlayerMove 결과: {result}");
+        MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - PlayerMove 결과: {result}");
 
         // 승리 조건 체크. result가 0이면 게임이 끝나지 않은 상태, 1이면 백이 승리, 2면 흑이 승리
         if (result == 0)
@@ -89,26 +99,26 @@ public class RoomHandler : HandlerBase
         if (user == null || user.IsConfirm(sessionID) == false)
         {
             MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - Invalid user. SessionID: {sessionID}");
-            SendResponseEnterRoomToClient(ErrorCode.RoomEnterInvalidUser, sessionID);
+            SendErrorResponse(ErrorCode.RoomEnterInvalidUser, sessionID);
             return;
         }
         if (user.IsStateRoom())
         {
             MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - User already in room. SessionID: {sessionID}");
-            SendResponseEnterRoomToClient(ErrorCode.RoomEnterInvalidState, sessionID);
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
             return;
         }
 
         // 대기 큐에 추가
         _roomManager._matchWaitingQueue.Add((sessionID, user.GetUserID()));
-        MainServer.s_MainLogger.Debug($"매치 대기 큐에 추가됨: {sessionID}, 유저ID: {user.GetUserID()}");
+        MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - 매치 대기 큐에 추가됨: {sessionID}, 유저ID: {user.GetUserID()}");
 
         // 두 명이 모이면 매치 성사
         if (_roomManager._matchWaitingQueue.Count >= 2)
         {
             try
             {
-                MainServer.s_MainLogger.Debug("매치 메이킹 시작: 두 명의 유저가 대기 중");
+                MainServer.s_MainLogger.Debug("HandleRequestMatchMake - 매칭 완료");
                 // 랜덤으로 색깔 배분
                 var rnd = new Random();
                 int first = rnd.Next(2); // 0 또는 1
@@ -129,13 +139,13 @@ public class RoomHandler : HandlerBase
                 var room = _roomManager.GetEmptyRoom();
                 room.AddUser(playerA.userID, playerA.sessionID);
                 room.AddUser(playerB.userID, playerB.sessionID);
-                MainServer.s_MainLogger.Debug($"전투 방 생성: {room.Number}, 유저A: {playerA.sessionID}({playerA.userID}), 유저B: {playerB.sessionID}({playerB.userID})");
+                
                 var userA = _userManager.GetUser(playerA.sessionID);
                 var userB = _userManager.GetUser(playerB.sessionID);
                 userA.EnteredRoom(room.Number);
                 userB.EnteredRoom(room.Number);
 
-                MainServer.s_MainLogger.Debug($"유저 방 입장: {userA.GetUserID()}({userA.RoomNumber}), {userB.GetUserID()}({userB.RoomNumber})");
+                
 
 
                 // 응답 패킷 생성 및 전송
@@ -156,6 +166,8 @@ public class RoomHandler : HandlerBase
                 var sendA = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyA);
                 var sendB = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyB);
 
+
+                // 각각 다른 색깔로 응답 전송
                 NetSendFunc(playerA.sessionID, sendA);
                 NetSendFunc(playerB.sessionID, sendB);
                 room.StartGame();
@@ -173,21 +185,6 @@ public class RoomHandler : HandlerBase
             }
         }
         // 두 명이 안 모이면 아무 응답도 하지 않고 대기
-    }
-
-
-
-    void SendResponseEnterRoomToClient(ErrorCode errorCode, string sessionID)
-    {
-        var resRoomEnter = new PKTResRoomEnter()
-        {
-            Result = (short)errorCode
-        };
-
-        var bodyData = MessagePackSerializer.Serialize(resRoomEnter);
-        var sendData = PacketToBytes.Make(PacketId.ResRoomEnter, bodyData);
-
-        NetSendFunc(sessionID, sendData);
     }
 
     // 방에서 나가겠다는 요청 처리
@@ -220,10 +217,30 @@ public class RoomHandler : HandlerBase
         }
         catch (Exception ex)
         {
-            MainServer.s_MainLogger.Debug("Room RequestLeave - Error: " );
+            MainServer.s_MainLogger.Debug("Room RequestLeave - Error: ");
             MainServer.s_MainLogger.Error(ex.ToString());
         }
     }
+
+
+    // -------------------------- 밑은 서버 내부 핸들러 -----------------------------
+
+
+    //Connection Handler에서 방 퇴장 알림을 받았을 때 호출되는 핸들러 (서버 내부 사용)
+    public void HandleNotifyLeaveInternal(ServerPacketData packetData)
+    {
+        var sessionID = packetData.SessionID;
+        MainServer.s_MainLogger.Debug($"NotifyLeaveInternal. SessionID: {sessionID}");
+
+        var reqData = MessagePackSerializer.Deserialize<PKTInternalNtfRoomLeave>(packetData.BodyData);
+        LeaveRoomUser(sessionID, reqData.RoomNumber);
+    }
+
+
+
+
+
+    //------------------------- 밑은 핸들러에서 사용하는 함수들-----------------------------
 
     bool LeaveRoomUser(string sessionID, int RoomNumber)
     {
@@ -247,7 +264,7 @@ public class RoomHandler : HandlerBase
         room.RemoveUser(roomUser);
 
         room.SendNotifyPacketLeaveUser(userID);
-        if(room.CurrentUserCount() == 0)
+        if (room.CurrentUserCount() == 0)
         {
             MainServer.s_MainLogger.Debug($"LeaveRoomUser - Room {RoomNumber} is empty, removing room");
             room.InitializeRoom(); // 방 초기화
@@ -267,15 +284,21 @@ public class RoomHandler : HandlerBase
 
         NetSendFunc(sessionID, sendData);
     }
-    
-    public void HandleNotifyLeaveInternal(ServerPacketData packetData)
-    {
-        var sessionID = packetData.SessionID;
-        MainServer.s_MainLogger.Debug($"NotifyLeaveInternal. SessionID: {sessionID}");
 
-        var reqData = MessagePackSerializer.Deserialize<PKTInternalNtfRoomLeave>(packetData.BodyData);            
-        LeaveRoomUser(sessionID, reqData.RoomNumber);
+    void SendErrorResponse(ErrorCode errorCode, string sessionID)
+    {
+        var resRoomEnter = new PKTResRoomEnter()
+        {
+            Result = (short)errorCode
+        };
+
+        var bodyData = MessagePackSerializer.Serialize(resRoomEnter);
+        var sendData = PacketToBytes.Make(PacketId.ResRoomEnter, bodyData);
+
+        NetSendFunc(sessionID, sendData);
     }
+    
+
 }
     // TODO: 아래는 채팅 기능 추가시 주석 해체할 것입니다.
     // 방 입장 요청 처리
