@@ -113,9 +113,14 @@ public class MainServer : AppServer<ClientSession, EFBinaryRequestInfo>
 
     public void InitManagers()
     {
+        // Room과 RoomManager에 네트워크 송신 함수 설정
         SocketServer.Room.Room.NetSendFunc = this.SendData;
+        _roomManager.SetNetSendFunc(this.SendData);
+        
+        // 방 생성
         _roomManager.CreateRooms();
 
+        // 유저 매니저 초기화
         var maxUserCount = s_ServerOption.RoomMaxCount * s_ServerOption.RoomMaxUserCount;
         _userManager.Init(maxUserCount);
     }

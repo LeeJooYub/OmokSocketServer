@@ -1,3 +1,7 @@
+using SocketServer.Users;
+using MessagePack;
+using SocketServer.Packet;
+
 namespace SocketServer.Room;
 
 
@@ -7,9 +11,16 @@ public class RoomManager
 {
     List<Room> _roomList = new List<Room>();
 
-    // 매치 대기 큐 (RoomHandler 클래스 내부에 선언)
-    public List<(string sessionID, string userID)> _matchWaitingQueue = new();
+    // 매치 대기 큐
+    private List<(string sessionID, string userID)> _matchWaitingQueue = new();
 
+    // 네트워크 전송 함수 참조
+    private Func<string, byte[], bool>? _netSendFunc;
+
+    public void SetNetSendFunc(Func<string, byte[], bool> netSendFunc)
+    {
+        _netSendFunc = netSendFunc;
+    }
 
     //  방들을 만든다.
     public void CreateRooms()
@@ -27,12 +38,12 @@ public class RoomManager
         }
     }
 
-    public Room GetEmptyRoom()
+    public Room? GetEmptyRoom()
     {
         for(int i = 0; i < _roomList.Count; i++)
         {
             var room = _roomList[i];
-            if (room.CurrentUserCount() ==0 && room.GetIsGameStart() == false)
+            if (room.CurrentUserCount() == 0 && room.GetIsGameStart() == false)
             {
                 return room;
             }
@@ -40,12 +51,73 @@ public class RoomManager
         return null;
     }
 
-    public Room GetRoom(int roomNumber)
+    public Room? GetRoom(int roomNumber)
     {
         return _roomList.Find(x => x.Number == roomNumber);
     }
 
+    public List<Room> GetRoomList() 
+    { 
+        return _roomList; 
+    }
+    
+    // 매치메이킹 큐 관리 메소드들
+    
+    public void AddToMatchWaitingQueue(string sessionID, string userID)
+    {
+        _matchWaitingQueue.Add((sessionID, userID));
+        MainServer.s_MainLogger.Debug($"매치 대기 큐에 추가됨: {sessionID}, 유저ID: {userID}");
+    }
+    
+    public List<(string sessionID, string userID)> GetMatchWaitingQueue()
+    {
+        return _matchWaitingQueue;
+    }
+    
+    public void ClearMatchWaitingQueue()
+    {
+        _matchWaitingQueue.Clear();
+    }
+    
+    public bool IsMatchWaitingQueueReady()
+    {
+        return _matchWaitingQueue.Count >= 2;
+    }
+    
+    public void RemoveInvalidUsersFromQueue(UserManager userManager)
+    {
+        _matchWaitingQueue.RemoveAll(p => userManager.GetUser(p.sessionID) == null);
+    }
+    
+    // 방 관련 기능
+    
+    public bool LeaveRoomUser(string sessionID, int roomNumber, out string userID)
+    {
+        userID = string.Empty;
+        var room = GetRoom(roomNumber);
+        if (room == null)
+        {
+            MainServer.s_MainLogger.Debug($"LeaveRoomUser - Invalid room number: {roomNumber}");
+            return false;
+        }
 
-    public List<Room> GetRoomList() { return _roomList; }
+        var roomUser = room.GetUserByNetSessionId(sessionID);
+        if (roomUser == null)
+        {
+            MainServer.s_MainLogger.Debug($"LeaveRoomUser - Invalid user session ID: {sessionID}");
+            return false;
+        }
+
+        userID = roomUser.GetUserID();
+        room.RemoveUser(roomUser);
+
+        room.SendNotifyPacketLeaveUser(userID);
+        if (room.CurrentUserCount() == 0)
+        {
+            MainServer.s_MainLogger.Debug($"LeaveRoomUser - Room {roomNumber} is empty, initializing room");
+            room.InitializeRoom(); // 방 초기화
+        }
+        return true;
+    }
 
 }

@@ -5,16 +5,15 @@ using MessagePack;
 
 namespace SocketServer.Handlers;
 
+/// <summary>
+/// 방 관련 요청을 처리하는 핸들러 클래스
+/// </summary>
 public class RoomHandler : HandlerBase
 {
-
-
-
     public override void RegisterPacketHandler(Dictionary<int, Action<ServerPacketData>> packetHandlerMap)
     {
         // 방 관련 패킷 핸들러 등록
         // 방 입장, 퇴장 요청 핸들러 등록
-        //packetHandlerMap.Add((int)PacketId.ReqRoomEnter, HandleRequestRoomEnter);
         packetHandlerMap.Add((int)PacketId.ReqRoomLeave, HandleRequestLeave);
 
         // 매치 메이킹 요청 및 응답 핸들러 등록
@@ -23,11 +22,6 @@ public class RoomHandler : HandlerBase
         // 착수 요청 핸들러
         packetHandlerMap.Add((int)PacketId.REQ_PUT_STONE, HandleRequestMoveStone);
 
-
-
-
-
-
         // 방 퇴장 알림 핸들러 (서버 내부에서 사용)
         packetHandlerMap.Add((int)PacketId.NtfInRoomLeave, HandleNotifyLeaveInternal);
     }
@@ -35,159 +29,68 @@ public class RoomHandler : HandlerBase
 
     // ------------------------------외부 요청 핸들러--------------------------------
 
-
-
-    // 착수 요청 핸들러
+    /// <summary>
+    /// 착수 요청 핸들러 - 오목판에 돌을 놓는 요청을 처리
+    /// </summary>
     public void HandleRequestMoveStone(ServerPacketData packetData)
     {
         MainServer.s_MainLogger.Debug("RoomHandler -> HandleRequestMoveStone 핸들러 호출");
         var sessionID = packetData.SessionID;
-        var user = _userManager.GetUser(sessionID);
-        if (user == null || user.IsConfirm(sessionID) == false)
+        
+        // 유저 유효성 검증
+        if (!ValidateUserForGameAction(sessionID, out var user, out var room, out var playerColor))
         {
-            MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - Invalid user or state. SessionID: {sessionID}");
-            SendErrorResponse(ErrorCode.RoomEnterInvalidUser, sessionID);
             return;
         }
 
-        if (user.IsStateRoom() == false)
+        try
         {
-            MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - User not in room. SessionID: {sessionID}");
-            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
-            return;
-        }
+            // 착수 처리
+            var req = MessagePackSerializer.Deserialize<PKTReqPutStone>(packetData.BodyData);
+            MainServer.s_MainLogger.Debug($"HandleRequestMoveStone: {sessionID}, X: {req.X}, Y: {req.Y}, PlayerColor: {playerColor}");
+            
+            // 플레이어 이동 처리 및 결과 확인
+            var result = room!.PlayerMove(req.X, req.Y, playerColor);
+            MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - PlayerMove 결과: {result}");
 
-        var room = _roomManager.GetRoom(user.GetRoomNumber());
-        if (room == null)
-        {
-            MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - Invalid room. SessionID: {sessionID}, RoomNumber: {user.GetRoomNumber()}");
-            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
-            return;
+            // 게임 결과 처리
+            ProcessGameMoveResult(room, req.X, req.Y, result);
         }
-
-        var playerColor = room.GetPlayerColor(user.GetUserID());
-        // 착수 처리
-        var req = MessagePackSerializer.Deserialize<PKTReqPutStone>(packetData.BodyData);
-        MainServer.s_MainLogger.Debug($"HandleRequestMoveStone: {sessionID}, X: {req.X}, Y: {req.Y}, PlayerColor: {playerColor}");
-        var result = room.PlayerMove(req.X, req.Y, playerColor);
-        MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - PlayerMove 결과: {result}");
-
-        // 승리 조건 체크. result가 0이면 게임이 끝나지 않은 상태, 1이면 백이 승리, 2면 흑이 승리
-        if (result == 0)
+        catch (Exception ex)
         {
-            // 성공적으로 착수한 경우, 모든 유저에게 알림
-            room.SendNotifyPlayerMove(req.X, req.Y, false, ' '); // 게임 종료 아님, 승리자 없음
-            return;
-        }
-        else if (result == 1 || result == 2) // 백이 이겼거나 흑이 이긴 경우
-        {
-            var winnerColor = result == 1 ? 'W' : 'B';
-            room.SendNotifyPlayerMove(req.X, req.Y, true, winnerColor);
-            MainServer.s_MainLogger.Debug($"게임 종료: {winnerColor} 승리");
-            room.InitializeGameStatus();
-            return;
+            MainServer.s_MainLogger.Error($"착수 처리 중 오류 발생: {ex}");
+            SendErrorResponse(ErrorCode.RoomEnterErrorSystem, sessionID);
         }
     }
 
-
-    // 매치메이킹 요청 핸들러
+    /// <summary>
+    /// 매치메이킹 요청 핸들러 - 다른 플레이어와의 매칭을 요청
+    /// </summary>
     public void HandleRequestMatchMake(ServerPacketData packetData)
     {
         var sessionID = packetData.SessionID;
         var user = _userManager.GetUser(sessionID);
         MainServer.s_MainLogger.Debug($"RoomHandler -> HandleRequestMatchMake 핸들러 호출: {sessionID}");
-        if (user == null || user.IsConfirm(sessionID) == false)
+        
+        // 유저 검증
+        if (!ValidateUserForMatchMaking(sessionID, user))
         {
-            MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - Invalid user. SessionID: {sessionID}");
-            SendErrorResponse(ErrorCode.RoomEnterInvalidUser, sessionID);
-            return;
-        }
-        if (user.IsStateRoom())
-        {
-            MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - User already in room. SessionID: {sessionID}");
-            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
             return;
         }
 
         // 대기 큐에 추가
-        _roomManager._matchWaitingQueue.Add((sessionID, user.GetUserID()));
-        MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - 매치 대기 큐에 추가됨: {sessionID}, 유저ID: {user.GetUserID()}");
+        _roomManager.AddToMatchWaitingQueue(sessionID, user.GetUserID());
 
-        // 두 명이 모이면 매치 성사
-        if (_roomManager._matchWaitingQueue.Count >= 2)
+        // 매치메이킹 진행 (두 명 이상일 때)
+        if (_roomManager.IsMatchWaitingQueueReady())
         {
-            try
-            {
-                MainServer.s_MainLogger.Debug("HandleRequestMatchMake - 매칭 완료");
-                // 랜덤으로 색깔 배분
-                var rnd = new Random();
-                int first = rnd.Next(2); // 0 또는 1
-                var playerA = _roomManager._matchWaitingQueue[0];
-                var playerB = _roomManager._matchWaitingQueue[1];
-
-                // 매치메이킹 전에 두 유저가 여전히 유효한지 확인
-                if (_userManager.GetUser(playerA.sessionID) == null || _userManager.GetUser(playerB.sessionID) == null)
-                {
-                    // 유효하지 않은 유저 제거 후 다시 시도
-                    _roomManager._matchWaitingQueue.RemoveAll(p => _userManager.GetUser(p.sessionID) == null);
-                    return;
-                }
-
-                var colorA = 'W';
-                var colorB = 'B';
-
-                var room = _roomManager.GetEmptyRoom();
-                room.AddUser(playerA.userID, playerA.sessionID);
-                room.AddUser(playerB.userID, playerB.sessionID);
-                
-                var userA = _userManager.GetUser(playerA.sessionID);
-                var userB = _userManager.GetUser(playerB.sessionID);
-                userA.EnteredRoom(room.Number);
-                userB.EnteredRoom(room.Number);
-
-                
-
-
-                // 응답 패킷 생성 및 전송
-                var resA = new PKTResMatchMake
-                {
-                    Result = (short)ErrorCode.None,
-                    Color = colorA
-                };
-                var resB = new PKTResMatchMake
-                {
-                    Result = (short)ErrorCode.None,
-                    Color = colorB
-                };
-
-                var bodyA = MessagePackSerializer.Serialize(resA);
-                var bodyB = MessagePackSerializer.Serialize(resB);
-
-                var sendA = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyA);
-                var sendB = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyB);
-
-
-                // 각각 다른 색깔로 응답 전송
-                NetSendFunc(playerA.sessionID, sendA);
-                NetSendFunc(playerB.sessionID, sendB);
-                room.StartGame();
-
-
-                // 대기 큐 초기화   
-                _roomManager._matchWaitingQueue.Clear();
-            }
-            catch (Exception ex)
-            {
-                MainServer.s_MainLogger.Error($"매치 메이킹 처리 중 오류 발생: {ex}");
-                // 오류 발생 시 대기 큐 초기화
-                _roomManager._matchWaitingQueue.Clear();
-                return;
-            }
+            ProcessMatchMaking();
         }
-        // 두 명이 안 모이면 아무 응답도 하지 않고 대기
     }
 
-    // 방에서 나가겠다는 요청 처리
+    /// <summary>
+    /// 방에서 나가겠다는 요청을 처리
+    /// </summary>
     public void HandleRequestLeave(ServerPacketData packetData)
     {
         var sessionID = packetData.SessionID;
@@ -203,14 +106,19 @@ public class RoomHandler : HandlerBase
             }
 
             MainServer.s_MainLogger.Debug($"LeaveRoomUser. SessionID:{sessionID}, RoomNumber:{user.RoomNumber}");
-            if (LeaveRoomUser(sessionID, user.RoomNumber) == false)
+            
+            // 방에서 유저 제거
+            string userID;
+            if (!_roomManager.LeaveRoomUser(sessionID, user.RoomNumber, out userID))
             {
                 MainServer.s_MainLogger.Debug("Room RequestLeave - Fail to leave room");
                 return;
             }
 
+            // 유저 상태 업데이트
             user.LeaveRoom();
 
+            // 클라이언트에 방 퇴장 응답 전송
             SendResponseLeaveRoomToClient(sessionID);
 
             MainServer.s_MainLogger.Debug("Room RequestLeave - Success");
@@ -223,55 +131,206 @@ public class RoomHandler : HandlerBase
     }
 
 
-    // -------------------------- 밑은 서버 내부 핸들러 -----------------------------
+    // -------------------------- 서버 내부 핸들러 -----------------------------
 
-
-    //Connection Handler에서 방 퇴장 알림을 받았을 때 호출되는 핸들러 (서버 내부 사용)
+    /// <summary>
+    /// Connection Handler에서 방 퇴장 알림을 받았을 때 호출되는 핸들러 (서버 내부 사용)
+    /// </summary>
     public void HandleNotifyLeaveInternal(ServerPacketData packetData)
     {
         var sessionID = packetData.SessionID;
         MainServer.s_MainLogger.Debug($"NotifyLeaveInternal. SessionID: {sessionID}");
 
         var reqData = MessagePackSerializer.Deserialize<PKTInternalNtfRoomLeave>(packetData.BodyData);
-        LeaveRoomUser(sessionID, reqData.RoomNumber);
+        string userID;
+        _roomManager.LeaveRoomUser(sessionID, reqData.RoomNumber, out userID);
     }
 
 
-
-
-
-    //------------------------- 밑은 핸들러에서 사용하는 함수들-----------------------------
-
-    bool LeaveRoomUser(string sessionID, int RoomNumber)
+    // -------------------------- 유효성 검사 및 기능 메소드 -----------------------------
+    
+    /// <summary>
+    /// 게임 액션(착수)을 위한 유저 유효성 검증
+    /// </summary>
+    private bool ValidateUserForGameAction(string sessionID, out Users.User? user, out Room.Room? room, out int playerColor)
     {
-        MainServer.s_MainLogger.Debug($"LeaveRoomUser. SessionID:{sessionID}");
+        user = null;
+        room = null;
+        playerColor = 0;
+        
+        // 유저 확인
+        user = _userManager.GetUser(sessionID);
+        if (user == null || user.IsConfirm(sessionID) == false)
+        {
+            MainServer.s_MainLogger.Debug($"ValidateUserForGameAction - Invalid user or state. SessionID: {sessionID}");
+            SendErrorResponse(ErrorCode.RoomEnterInvalidUser, sessionID);
+            return false;
+        }
 
-        var room = _roomManager.GetRoom(RoomNumber);
+        // 유저가 방에 있는지 확인
+        if (user.IsStateRoom() == false)
+        {
+            MainServer.s_MainLogger.Debug($"ValidateUserForGameAction - User not in room. SessionID: {sessionID}");
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
+            return false;
+        }
+
+        // 방 확인
+        room = _roomManager.GetRoom(user.GetRoomNumber());
         if (room == null)
         {
-            MainServer.s_MainLogger.Debug($"LeaveRoomUser - Invalid room number: {RoomNumber}");
+            MainServer.s_MainLogger.Debug($"ValidateUserForGameAction - Invalid room. SessionID: {sessionID}, RoomNumber: {user.GetRoomNumber()}");
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
             return false;
         }
 
-        var roomUser = room.GetUserByNetSessionId(sessionID);
-        if (roomUser == null)
+        // 플레이어 색상 확인
+        playerColor = room.GetPlayerColor(user.GetUserID());
+        if (playerColor == 0)
         {
-            MainServer.s_MainLogger.Debug($"LeaveRoomUser - Invalid user session ID: {sessionID}");
+            MainServer.s_MainLogger.Debug($"ValidateUserForGameAction - Invalid player color. SessionID: {sessionID}");
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
             return false;
         }
-
-        var userID = roomUser.GetUserID();
-        room.RemoveUser(roomUser);
-
-        room.SendNotifyPacketLeaveUser(userID);
-        if (room.CurrentUserCount() == 0)
-        {
-            MainServer.s_MainLogger.Debug($"LeaveRoomUser - Room {RoomNumber} is empty, removing room");
-            room.InitializeRoom(); // 방 초기화
-        }
+        
         return true;
     }
+    
+    /// <summary>
+    /// 매치메이킹을 위한 유저 유효성 검증
+    /// </summary>
+    private bool ValidateUserForMatchMaking(string sessionID, Users.User? user)
+    {
+        if (user == null || user.IsConfirm(sessionID) == false)
+        {
+            MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - Invalid user. SessionID: {sessionID}");
+            SendErrorResponse(ErrorCode.RoomEnterInvalidUser, sessionID);
+            return false;
+        }
+        
+        if (user.IsStateRoom())
+        {
+            MainServer.s_MainLogger.Debug($"HandleRequestMatchMake - User already in room. SessionID: {sessionID}");
+            SendErrorResponse(ErrorCode.RoomEnterInvalidState, sessionID);
+            return false;
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// 게임 이동(착수) 결과 처리
+    /// </summary>
+    private void ProcessGameMoveResult(Room.Room? room, int x, int y, int result)
+    {
+        if (room == null) return;
+        
+        // result: 0=게임 계속, 1=백 승리, 2=흑 승리
+        if (result == 0)
+        {
+            // 성공적으로 착수한 경우, 모든 유저에게 알림
+            room.SendNotifyPlayerMove(x, y, false, ' '); // 게임 종료 아님, 승리자 없음
+        }
+        else if (result == 1 || result == 2) // 백이 이겼거나 흑이 이긴 경우
+        {
+            var winnerColor = result == 1 ? 'W' : 'B';
+            room.SendNotifyPlayerMove(x, y, true, winnerColor);
+            MainServer.s_MainLogger.Debug($"게임 종료: {winnerColor} 승리");
+            room.InitializeGameStatus();
+        }
+    }
+    
+    /// <summary>
+    /// 매치메이킹 처리
+    /// </summary>
+    private void ProcessMatchMaking()
+    {
+        try
+        {
+            MainServer.s_MainLogger.Debug("HandleRequestMatchMake - 매칭 완료");
+            var queue = _roomManager.GetMatchWaitingQueue();
+            
+            // 랜덤으로 색깔 배분 (필요시)
+            var playerA = queue[0];
+            var playerB = queue[1];
 
+            // 매치메이킹 전에 두 유저가 여전히 유효한지 확인
+            if (_userManager.GetUser(playerA.sessionID) == null || _userManager.GetUser(playerB.sessionID) == null)
+            {
+                // 유효하지 않은 유저 제거 후 대기 큐 정리
+                _roomManager.RemoveInvalidUsersFromQueue(_userManager);
+                return;
+            }
+
+            // 색상 설정 (백과 흑)
+            var colorA = 'W';
+            var colorB = 'B';
+
+            // 방 할당 및 유저 추가
+            var room = _roomManager.GetEmptyRoom();
+            if (room == null)
+            {
+                MainServer.s_MainLogger.Error("매치메이킹 실패: 빈 방이 없습니다.");
+                _roomManager.ClearMatchWaitingQueue();
+                return;
+            }
+            
+            room.AddUser(playerA.userID, playerA.sessionID);
+            room.AddUser(playerB.userID, playerB.sessionID);
+            
+            // 유저 상태 업데이트
+            var userA = _userManager.GetUser(playerA.sessionID);
+            var userB = _userManager.GetUser(playerB.sessionID);
+            if (userA != null) userA.EnteredRoom(room.Number);
+            if (userB != null) userB.EnteredRoom(room.Number);
+
+            // 매치메이킹 응답 전송
+            SendMatchMakingResponse(playerA.sessionID, playerB.sessionID, colorA, colorB);
+            
+            // 게임 시작
+            room.StartGame();
+
+            // 대기 큐 초기화
+            _roomManager.ClearMatchWaitingQueue();
+        }
+        catch (Exception ex)
+        {
+            MainServer.s_MainLogger.Error($"매치 메이킹 처리 중 오류 발생: {ex}");
+            _roomManager.ClearMatchWaitingQueue();
+        }
+    }
+    
+    /// <summary>
+    /// 매치메이킹 응답 전송
+    /// </summary>
+    private void SendMatchMakingResponse(string sessionIdA, string sessionIdB, char colorA, char colorB)
+    {
+        // 응답 패킷 생성
+        var resA = new PKTResMatchMake
+        {
+            Result = (short)ErrorCode.None,
+            Color = colorA
+        };
+        var resB = new PKTResMatchMake
+        {
+            Result = (short)ErrorCode.None,
+            Color = colorB
+        };
+
+        var bodyA = MessagePackSerializer.Serialize(resA);
+        var bodyB = MessagePackSerializer.Serialize(resB);
+
+        var sendA = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyA);
+        var sendB = PacketToBytes.Make(PacketId.RES_MATCH_MAKE, bodyB);
+
+        // 각각 응답 전송
+        NetSendFunc(sessionIdA, sendA);
+        NetSendFunc(sessionIdB, sendB);
+    }
+
+    /// <summary>
+    /// 방 퇴장 응답을 클라이언트에 전송
+    /// </summary>
     void SendResponseLeaveRoomToClient(string sessionID)
     {
         var resRoomLeave = new PKTResRoomLeave()
@@ -285,6 +344,9 @@ public class RoomHandler : HandlerBase
         NetSendFunc(sessionID, sendData);
     }
 
+    /// <summary>
+    /// 오류 응답을 클라이언트에 전송
+    /// </summary>
     void SendErrorResponse(ErrorCode errorCode, string sessionID)
     {
         var resRoomEnter = new PKTResRoomEnter()
