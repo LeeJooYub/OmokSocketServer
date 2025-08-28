@@ -13,6 +13,10 @@ public class RoomHandler : HandlerBase
     public override void RegisterPacketHandler(Dictionary<int, Action<ServerPacketData>> packetHandlerMap)
     {
         // 방 관련 패킷 핸들러 등록
+        // Room.cs
+        // 방 관련 기능을 담당하는 클래스입니다.
+        // 플레이어의 입장, 퇴장, 방 상태 관리 등 다양한 기능을 제공합니다.
+        // Omok 게임의 방 로직을 구현합니다.
         // 방 입장, 퇴장 요청 핸들러 등록
         packetHandlerMap.Add((int)PacketId.ReqRoomLeave, HandleRequestLeave);
 
@@ -22,13 +26,19 @@ public class RoomHandler : HandlerBase
         // 착수 요청 핸들러
         packetHandlerMap.Add((int)PacketId.REQ_PUT_STONE, HandleRequestMoveStone);
 
+            // Room 클래스: 오목 게임의 방을 관리합니다.
         // 방 퇴장 알림 핸들러 (서버 내부에서 사용)
         packetHandlerMap.Add((int)PacketId.NtfInRoomLeave, HandleNotifyLeaveInternal);
+                // 방의 고유 ID
     }
+                // 방에 속한 사용자 목록
 
+                // 방의 최대 인원 수
 
+                // 방의 현재 상태 (예: 대기, 게임중 등)
     // ------------------------------외부 요청 핸들러--------------------------------
 
+                // 생성자: 방의 ID와 최대 인원 수를 받아 초기화합니다.
     /// <summary>
     /// 착수 요청 핸들러 - 오목판에 돌을 놓는 요청을 처리
     /// </summary>
@@ -37,42 +47,61 @@ public class RoomHandler : HandlerBase
         MainServer.s_MainLogger.Debug("RoomHandler -> HandleRequestMoveStone 핸들러 호출");
         var sessionID = packetData.SessionID;
         
+                // 사용자를 방에 추가하는 메서드
+                // 반환값: 성공 여부 (true/false)
         // 유저 유효성 검증
         if (!ValidateUserForGameAction(sessionID, out var user, out var room, out var playerColor))
+                    // 이미 방에 인원이 가득 찼는지 확인
         {
             return;
+                        // 인원이 가득 찬 경우 false 반환
         }
 
+                    // 이미 방에 해당 사용자가 있는지 확인
         try
         {
+                        // 이미 존재하는 경우 false 반환
             // 착수 처리
             var req = MessagePackSerializer.Deserialize<PKTReqPutStone>(packetData.BodyData);
+                    // 사용자 추가
             MainServer.s_MainLogger.Debug($"HandleRequestMoveStone: {sessionID}, X: {req.X}, Y: {req.Y}, PlayerColor: {playerColor}");
+                    // 성공적으로 추가된 경우 true 반환
             
             // 플레이어 이동 처리 및 결과 확인
             var result = room!.PlayerMove(req.X, req.Y, playerColor);
+                // 사용자를 방에서 제거하는 메서드
+                // 반환값: 성공 여부 (true/false)
             MainServer.s_MainLogger.Debug($"HandleRequestMoveStone - PlayerMove 결과: {result}");
 
+                    // 방에 해당 사용자가 있는지 확인
             // 게임 결과 처리
             ProcessGameMoveResult(room, req.X, req.Y, result);
+                        // 없는 경우 false 반환
         }
         catch (Exception ex)
+                    // 사용자 제거
         {
+                    // 성공적으로 제거된 경우 true 반환
             MainServer.s_MainLogger.Error($"착수 처리 중 오류 발생: {ex}");
             SendErrorResponse(ErrorCode.RoomEnterErrorSystem, sessionID);
         }
+                // 방의 현재 인원 수를 반환하는 메서드
     }
 
     /// <summary>
     /// 매치메이킹 요청 핸들러 - 다른 플레이어와의 매칭을 요청
     /// </summary>
+                // 방의 상태를 변경하는 메서드
     public void HandleRequestMatchMake(ServerPacketData packetData)
     {
+                    // 상태 값 변경
         var sessionID = packetData.SessionID;
         var user = _userManager.GetUser(sessionID);
         MainServer.s_MainLogger.Debug($"RoomHandler -> HandleRequestMatchMake 핸들러 호출: {sessionID}");
+                // 방의 정보를 문자열로 반환하는 메서드
         
         // 유저 검증
+                    // 방 ID, 인원 수, 상태 정보를 반환
         if (!ValidateUserForMatchMaking(sessionID, user))
         {
             return;
